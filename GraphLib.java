@@ -1,106 +1,127 @@
-import java.util.*;
-import java.util.Comparator;
-
 /**
- * Library for graph analysis
- *
  * @author Chipo Chibbamulilo
  * @author Chikwanda Chisha
- *
+ * Graph library implementing BFS, getPath,missingV,averageSeparation and verticesInDegree
  */
-public class GraphLib {
-    /**
-     * Takes a random walk from a vertex, up to a given number of steps
-     * So a 0-step path only includes start, while a 1-step path includes start and one of its out-neighbors,
-     * and a 2-step path includes start, an out-neighbor, and one of the out-neighbor's out-neighbors
-     * Stops earlier if no step can be taken (i.e., reach a vertex with no out-edge)
-     * @param g		graph to walk on
-     * @param start	initial vertex (assumed to be in graph)
-     * @param steps	max number of steps
-     * @return		a list of vertices starting with start, each with an edge to the sequentially next in the list;
-     * 			    null if start isn't in graph
-     */
-    public static <V,E> List<V> randomWalk(Graph<V,E> g, V start, int steps) {
 
-        // initialize path;
-        ArrayList<V> path= new ArrayList<>();
-        path.add(start);
+import java.util.*;
 
-        for(int i=steps; i>0;i--) {
-            //stop if the vertex has no outNeighbor
-            if (g.outNeighbors(path.get(path.size() - 1)) == null) break;
+public class GraphLib<V,E> {
 
-            else {
-                ArrayList<V> neighbors = new ArrayList<>();
+    public static <V,E> Graph<V,E> bfs(Graph<V,E> g, V source){
+        //instantiate graph
+        Graph<V,E> pathTree= new AdjacencyMapGraph<>();
 
-                for (V v : g.outNeighbors(path.get(path.size() - 1))) {
-                    //add the neighbors of v into neighbors array
-                    neighbors.add(v);
-                }
-                //randomly pick the index in neighbors in which the walk proceeds, add to list
-                if(!neighbors.isEmpty()) {
-                    int j = (int) (Math.random() * neighbors.size());
-                    path.add(neighbors.get(j));
+        //adding first element to graph
+        pathTree.insertVertex(source);
+
+        //instantiate set to keep the visited
+        Set<V> visited=new HashSet<>();
+
+        // instantiate queue
+        Queue<V> queue=new LinkedList<>();
+
+        queue.add(source);
+        visited.add(source);
+
+        while(!queue.isEmpty()){
+            V v= queue.remove();
+
+            for (V i: g.outNeighbors(v) ){
+                //check if been visited
+                if(!visited.contains(i)) {
+                    visited.add(i);
+                    queue.add(i);
+
+                    //add vertex and directed edge to the graph
+                    pathTree.insertVertex(i);
+                    pathTree.insertDirected(i, v, g.getLabel(i, v));
                 }
             }
         }
-        return path;
+        return pathTree;
     }
 
+    public static <V,E> List<V> getPath(Graph<V,E> tree, V v){
+       // instantiate new list
+       ArrayList<V> path= new ArrayList<>();
 
-    /**
-     * Orders vertices in decreasing order by their in-degree
-     * @param g		graph
-     * @return		list of vertices sorted by in-degree, decreasing (i.e., largest at index 0)
-     */
-    public static <V,E> List<V> verticesByInDegree(Graph<V,E> g) {
-        ArrayList<V> decreaseList=new ArrayList<>();
+        path.add(v);
+        V u=v;
 
-        for (V v: g.vertices()){
-          decreaseList.add(v);
+        //adding vertices from pathtree to path(Arraylist)
+        while(tree.outNeighbors(u).iterator().hasNext()){
+           path.addAll((Collection<? extends V>) tree.outNeighbors(u));
+
+           //u's changed to the next out neighbor
+           u= tree.outNeighbors(u).iterator().next();
+        }
+       return path;
+    }
+
+    public static <V,E> Set<V> missingVertices(Graph<V,E> graph, Graph<V,E> subgraph) throws Exception {
+        //instantiate set and map
+        Set<V> missingV= new HashSet<>();
+
+        //sending the graphs over to a helper function that returns a map
+        Map<V, Integer> freqmap= mapFrequencies(subgraph,graph);
+
+        //checking the frequencies of the elements
+        for(V v: freqmap.keySet()){
+
+            //only add to set if v has a frequency of one
+            if(freqmap.get(v)==1){
+                missingV.add(v);
+            }
         }
 
-        //custom comparator
-        Comparator<V> listComparator = (v1, v2)-> {
-
-                if (g.inDegree(v1) > g.inDegree(v2)) return 1;
-
-                else if (g.inDegree(v1) == g.inDegree(v2)) {
-                    return 0;
-                }
-                else {
-                    return -1;
-                }
-        };
-        // sort according to descending order
-        decreaseList.sort(listComparator);
-
-        for(V i:decreaseList) System.out.println(g.inDegree(i));
-
-        return decreaseList;
+        return missingV;
     }
 
+    public static <V,E> Map<V, Integer> mapFrequencies(Graph<V,E> g1, Graph<V,E> g2) throws Exception{
+        if (g1==null|| g2==null) throw new Exception("One or Both of the Trees is null");
 
-    public static void main(String[] args) {
-        Graph<String,String> g=new AdjacencyMapGraph<String,String>();
+        Map<V,Integer> freqmap= new HashMap<>();
+        //iteration for g1
+        for (V v: g1.vertices()){
+            //first occurrence of actors
+                freqmap.put(v,1);
+        }
 
-        g.insertVertex("A");
-        g.insertVertex("B");
-        g.insertVertex("C");
-        g.insertVertex("D");
-        g.insertVertex("E");
-        g.insertUndirected("A","B","undirected");
-        g.insertUndirected("A","C","undirected");
-        g.insertUndirected("B","C","undirected");
-        g.insertDirected("E","B","directed");
-        g.insertDirected("A","D","directed");
-        g.insertDirected("C","D","directed");
-        g.insertDirected("E","C","directed");
-        g.insertDirected("A","E","directed");
+        //iteration for g2
+        for (V v: g2.vertices()){
 
-        System.out.println("Path taken: "+ randomWalk(g,"A",5));
-        System.out.println("-------\n"+"Sorted:\n"+verticesByInDegree(g));
+            if(!freqmap.containsKey(v)){
+                freqmap.put(v,1);
+            }
+            else{
+                freqmap.put(v, freqmap.get(v)+1);
+            }
+        }
+       return freqmap;
+    }
 
+    public static <V,E> double averageSeparation(Graph<V,E> tree, V root){
+        // average Separation= (total path length /number of vertices)
+       return totalSep(tree,root,0)/tree.numVertices();
+    }
+
+    public static <V,E> double totalSep(Graph<V,E> tree, V root,int num){
+        //base case
+        if(!tree.inNeighbors(root).iterator().hasNext()) return num;
+        double total = num;
+
+        for(V v: tree.inNeighbors(root)){
+            //obtaining total pathlength by recursion
+            total += totalSep(tree,v,num+1);
+        }
+        return total;
+    }
+
+    public static <V,E> List<V> verticesByInDegree(Graph<V,E> g) {
+        List<V> vertices = new ArrayList<V>((Collection<? extends V>) g.vertices());
+        vertices.sort((v1, v2) -> g.inDegree(v2) - g.inDegree(v1));
+        return vertices;
 
     }
 
